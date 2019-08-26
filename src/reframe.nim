@@ -578,7 +578,7 @@ proc is_symbol_resolved_as*(env: Environment,
   else:
     return false
 
-proc find_reframe_events*(opts: Options, env: Environment, event_defs: var seq[ReframeItem]): void =
+proc find_reframe_items*(opts: Options, env: Environment, event_defs: var seq[ReframeItem]): void =
   ## Modifies 'event_defs' argument.
   let eof_val : EdnNode = edn.new_edn_keyword("", "eof")
   var parser_opts = common_parse_opts(eof_val)
@@ -695,7 +695,7 @@ proc find_reframe_items_in_root(opts: Options, env: Environment, source_root: st
       var updated_opts = opts
       updated_opts.file_name = path
       case opts.command
-      of "index": find_reframe_events(updated_opts, env, event_defs)
+      of "index": find_reframe_items(updated_opts, env, event_defs)
     except:
       echo "Failed whern processing " & $path
       raise

@@ -14,7 +14,7 @@ test "can add":
   for path in walk_dir_rec("test-data"):
     var updated_opts = opts
     updated_opts.file_name = path
-    find_reframe_events(updated_opts, env, reframe_defs)
+    find_reframe_items(updated_opts, env, reframe_defs)
 
   assert reframe_defs.len == 4
   

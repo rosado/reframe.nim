@@ -768,8 +768,9 @@ proc find_and_print_reframe_data(opts: Options): Environment =
   process_item_defs(opts, env, item_defs)
   return env
 
-proc print_usage(): void =
+proc print_usage_and_quit(): void =
   echo "usage: reframe cmd -r=src_root -r=other_root"
+  quit(1)
 
 proc parse_command_line(): Option[Options] =
   let cmd_line = cast[seq[string]](command_line_params())
@@ -778,6 +779,7 @@ proc parse_command_line(): Option[Options] =
   var opt_count = 0
   opts.source_roots = @[]
   for kind, key, value in parsed.getopt():
+    inc(opt_count)
     case kind
     of cmd_long_option, cmd_short_option:
       if value == "":
@@ -799,7 +801,7 @@ proc parse_command_line(): Option[Options] =
         opts.command = key
     else:
       return none(Options)
-      
+  if opt_count == 0: return none(Options)
   return some(opts)
 
 when is_main_module:
@@ -807,5 +809,5 @@ when is_main_module:
   if opts.is_some:
     discard find_and_print_reframe_data(opts.get())
   else:
-    print_usage()
+    print_usage_and_quit()
 

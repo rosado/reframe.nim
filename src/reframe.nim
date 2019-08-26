@@ -703,7 +703,7 @@ proc find_reframe_events_in_root(opts: Options, env: Environment, source_root: s
   return event_defs
 
 # TODO: rename event_defs to item_defs
-proc process_event_defs(opts: Options, env: Environment, event_defs: var seq[ReframeItem]): void =
+proc process_item_defs(opts: Options, env: Environment, event_defs: var seq[ReframeItem]): void =
   ## processes ReframeItems found and fills in meta data when possible
   ## and prints prints them in line format.
   for index in event_defs.low()..event_defs.high():
@@ -766,7 +766,7 @@ proc find_and_print_reframe_data(opts: Options): Environment =
         raise
     else:
       echo "not a directory: " & item
-  process_event_defs(opts, env, event_defs)
+  process_item_defs(opts, env, event_defs)
   return env
 
 proc print_usage(): void =

@@ -578,11 +578,11 @@ proc is_symbol_resolved_as*(env: Environment,
   else:
     return false
 
-proc find_reframe_items*(opts: Options, env: Environment, event_defs: var seq[ReframeItem]): void =
-  ## Modifies 'event_defs' argument.
+proc find_reframe_items*(opts: Options, env: Environment, item_defs: var seq[ReframeItem]): void =
+  ## Modifies 'item_defs' argument.
   let eof_val : EdnNode = edn.new_edn_keyword("", "eof")
   var parser_opts = common_parse_opts(eof_val)
-  let initial_max_index = max(event_defs.high(), 0)
+  let initial_max_index = max(item_defs.high(), 0)
 
   init_edn_readers(parser_opts)
   var p: EdnParser
@@ -604,16 +604,16 @@ proc find_reframe_items*(opts: Options, env: Environment, event_defs: var seq[Re
     elif is_regevent_form(node):
       var def_item = process_regevent_form(node, current_ns, env, opts.file_name)
       ##****** NEED ABILITY TO LOOKUP schema.core/fn in env (e.g. resolve file's s/fn to fully qualified symbol)
-      event_defs.add(def_item)
+      item_defs.add(def_item)
     elif is_regsub_form(node):
       var def_item = process_regsub_form(node, current_ns, env, opts.file_name)
-      event_defs.add(def_item)
+      item_defs.add(def_item)
     elif is_regfx_form(node):
       var def_item = process_regfx_form(node, current_ns, env, opts.file_name)
-      event_defs.add(def_item)
+      item_defs.add(def_item)
     elif is_regcofx_form(node):
       var def_item = process_regcofx_form(node, current_ns, env, opts.file_name)
-      event_defs.add(def_item)
+      item_defs.add(def_item)
     elif is_def_form(node):
       discard process_def_form(node, current_ns, env)
     elif is_defn_form(node):
@@ -688,25 +688,25 @@ proc format_event_key(def: ReframeItem): string =
 
 proc find_reframe_items_in_root(opts: Options, env: Environment, source_root: string): seq[ReframeItem] =
   assert exists_dir(source_root)
-  var event_defs: seq[ReframeItem] = @[]
+  var item_defs: seq[ReframeItem] = @[]
 
   for path in walk_dir_rec(source_root):
     try:
       var updated_opts = opts
       updated_opts.file_name = path
       case opts.command
-      of "index": find_reframe_items(updated_opts, env, event_defs)
+      of "index": find_reframe_items(updated_opts, env, item_defs)
     except:
       echo "Failed whern processing " & $path
       raise
   
-  return event_defs
+  return item_defs
 
-proc process_item_defs(opts: Options, env: Environment, event_defs: var seq[ReframeItem]): void =
+proc process_item_defs(opts: Options, env: Environment, item_defs: var seq[ReframeItem]): void =
   ## processes ReframeItems found and fills in meta data when possible
   ## and prints prints them in line format.
-  for index in event_defs.low()..event_defs.high():
-    var def = event_defs[index]
+  for index in item_defs.low()..item_defs.high():
+    var def = item_defs[index]
     case def.kind
     of VarReference:
       if env.namespaces.contains(def.target_ns):
@@ -723,12 +723,12 @@ proc process_item_defs(opts: Options, env: Environment, event_defs: var seq[Refr
         #def.target_ns = nil
         def.target_file_name = ""
         def.referenced_line = -1
-      event_defs[index] = def
+      item_defs[index] = def
     else:
       # inline, no need to resolve the definition
       discard
 
-  for def in event_defs:
+  for def in item_defs:
     case def.kind
     of VarReference:
       var target_file_name: string = ""
@@ -753,19 +753,19 @@ proc not_empty(s: string): bool = not is_nil_or_whitespace(s)
 
 proc find_and_print_reframe_data(opts: Options): Environment =
   let env = new_environment()
-  var event_defs: seq[ReframeItem] = @[]
+  var item_defs: seq[ReframeItem] = @[]
   let src_roots = filter(opts.source_roots, not_empty)
   for item in src_roots:
     if exists_dir(item):
       try:
         # TODO: debug report branch should happen here
-        event_defs.add(find_reframe_items_in_root(opts, env, item))
+        item_defs.add(find_reframe_items_in_root(opts, env, item))
       except:
         echo "Unknown exception: " & $item
         raise
     else:
       echo "not a directory: " & item
-  process_item_defs(opts, env, event_defs)
+  process_item_defs(opts, env, item_defs)
   return env
 
 proc print_usage(): void =

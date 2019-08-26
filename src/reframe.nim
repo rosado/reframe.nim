@@ -686,7 +686,7 @@ proc format_event_key(def: ReframeItem): string =
       return $def.event_key
 
 
-proc find_reframe_events_in_root(opts: Options, env: Environment, source_root: string): seq[ReframeItem] =
+proc find_reframe_items_in_root(opts: Options, env: Environment, source_root: string): seq[ReframeItem] =
   assert exists_dir(source_root)
   var event_defs: seq[ReframeItem] = @[]
 
@@ -702,7 +702,6 @@ proc find_reframe_events_in_root(opts: Options, env: Environment, source_root: s
   
   return event_defs
 
-# TODO: rename event_defs to item_defs
 proc process_item_defs(opts: Options, env: Environment, event_defs: var seq[ReframeItem]): void =
   ## processes ReframeItems found and fills in meta data when possible
   ## and prints prints them in line format.
@@ -760,7 +759,7 @@ proc find_and_print_reframe_data(opts: Options): Environment =
     if exists_dir(item):
       try:
         # TODO: debug report branch should happen here
-        event_defs.add(find_reframe_events_in_root(opts, env, item))
+        event_defs.add(find_reframe_items_in_root(opts, env, item))
       except:
         echo "Unknown exception: " & $item
         raise

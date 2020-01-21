@@ -415,10 +415,8 @@ proc process_ns_form*(node: EdnNode, env: Environment, file_name: string): EdnNo
 
   # process :require-s within a ns form
   var
-    #guard = 0
     start_pos = 2
     req = next_ns_require_pos(node.list, start_pos)
-  #while req.is_some and guard < 10:
   while req.is_some:
     start_pos = req.get
     let require_form = node.list[start_pos]
@@ -435,7 +433,6 @@ proc process_ns_form*(node: EdnNode, env: Environment, file_name: string): EdnNo
         else:
           assert false
     inc(start_pos)
-    #inc(guard)
     req = next_ns_require_pos(node.list, start_pos)
 
   env.namespaces[ns_symbol] = ns
@@ -477,7 +474,7 @@ proc process_def_form*(node: EdnNode, ns_symbol: EdnNode, env: Environment): boo
   return false
 
 proc skip_nils(p: var EdnParser, node: EdnNode): EdnNode =
-  var n: EdnNode # TODO: does local get nil by default?
+  var n: EdnNode
   while n == nil:
     n = read(p)
   return n

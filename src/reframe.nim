@@ -9,7 +9,7 @@ type
   Options* = object
     source_roots*: seq[string]
     file_name*: string
-    command: string
+    command*: string
 
   FunctionArityInfo = object
     arglist: EdnNode
@@ -19,7 +19,7 @@ type
     name: EdnNode #TODO: should we fill the ns when parsing?
     arities: TableRef[int, FunctionArityInfo]
 
-  NamespaceObj = object
+  NamespaceObj* = object
     name*: string
     file_name*: string
     aliases*:  TableRef[string, string] # Symbol->Namespace in clojure (:refer)
@@ -30,9 +30,9 @@ type
   # ResolutionDataObj = object
   #   unresolved_defines: TableRef[EdnNode, ] # namespace->
   
-  Environment = ref EnvironmentObj
-  EnvironmentObj = object
-    namespaces: TableRef[EdnNode, NamespaceObj]
+  Environment* = ref EnvironmentObj
+  EnvironmentObj* = object
+    namespaces*: TableRef[EdnNode, NamespaceObj]
 
   FnDefinitionKind = enum
     InlineDefinition
@@ -319,7 +319,7 @@ proc resove_implementation(node, ns_symbol: EdnNode,
                          kind: InlineDefinition,
                          file_name: file_name,
                          line: inline_fn_line_num)
-    if item_key.is_namespaced:
+    if item_key.namespacing == LocalNamespace:
       result.current_ns = some(ns_symbol)
     else:
       result.current_ns = none(EdnNode)
@@ -424,7 +424,7 @@ proc process_ns_form*(node: EdnNode, env: Environment, file_name: string): EdnNo
       for i in 1 .. require_form.list.high:
         #assert require_form.list[index].kind == EdnVector
         let elem = require_form.list[i]
-        if elem.kind == EdnVector:
+        if elem.kind == EdnVector or elem.kind == EdnList:
           ns = process_require_elem(elem, ns, "")
         elif elem.kind == EdnSymbol:
           ns.required[elem.symbol.name] = true
@@ -473,7 +473,7 @@ proc process_def_form*(node: EdnNode, ns_symbol: EdnNode, env: Environment): boo
     return true
   return false
 
-proc skip_nils(p: var EdnParser, node: EdnNode): EdnNode =
+proc skip_nils*(p: var EdnParser, node: EdnNode): EdnNode =
   var n: EdnNode
   while n == nil:
     n = read(p)
@@ -579,7 +579,7 @@ proc find_reframe_items*(opts: Options, env: Environment, item_defs: var seq[Ref
   ## Modifies 'item_defs' argument.
   let eof_val : EdnNode = edn.new_edn_keyword("", "eof")
   var parser_opts = common_parse_opts(eof_val)
-  let initial_max_index = max(item_defs.high(), 0)
+  #let initial_max_index = max(item_defs.high(), 0)
 
   init_edn_readers(parser_opts)
   var p: EdnParser
@@ -672,12 +672,12 @@ proc DEBUG_print_env_data(env: Environment): void =
 proc format_event_key(def: ReframeItem): string =
   case def.kind
   of VarReference:
-    if def.event_key.is_namespaced:
+    if def.event_key.namespacing == LocalNamespace:
       return format("$#/$#", def.target_ns, def.event_key.keyword.name)
     else:
       return $def.event_key
   of InlineDefinition:
-    if def.event_key.is_namespaced and def.current_ns.is_some():
+    if def.event_key.namespacing == LocalNamespace and def.current_ns.is_some():
       return format(":$#/$#", def.current_ns.get(), def.event_key.keyword.name)
     else:
       return $def.event_key
@@ -694,7 +694,7 @@ proc find_reframe_items_in_root(opts: Options, env: Environment, source_root: st
       case opts.command
       of "index": find_reframe_items(updated_opts, env, item_defs)
     except:
-      echo "Failed whern processing " & $path
+      echo "Failed when processing " & $path
       raise
   
   return item_defs
@@ -746,22 +746,22 @@ proc process_item_defs(opts: Options, env: Environment, item_defs: var seq[Refra
                   def.reframe_type)
   return
 
-proc not_empty(s: string): bool = not is_nil_or_whitespace(s)
+proc not_empty*(s: string): bool = not is_nil_or_whitespace(s)
 
 proc find_and_print_reframe_data(opts: Options): Environment =
   let env = new_environment()
   var item_defs: seq[ReframeItem] = @[]
   let src_roots = filter(opts.source_roots, not_empty)
-  for item in src_roots:
-    if exists_dir(item):
+  for root in src_roots:
+    if exists_dir(root):
       try:
         # TODO: debug report branch should happen here
-        item_defs.add(find_reframe_items_in_root(opts, env, item))
+        item_defs.add(find_reframe_items_in_root(opts, env, root))
       except:
-        echo "Unknown exception: " & $item
+        echo "Unknown exception in source root: " & $root
         raise
     else:
-      echo "not a directory: " & item
+      echo "not a directory: " & root
   process_item_defs(opts, env, item_defs)
   return env
 
@@ -793,7 +793,7 @@ proc parse_command_line(): Option[Options] =
       if opts.command != "":
         return none(Options)
       if key != "index":
-        return none(Options) 
+        return none(Options)
       else:
         opts.command = key
     else:

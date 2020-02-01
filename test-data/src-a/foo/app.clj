@@ -8,7 +8,15 @@
   (:require [cljs-time :as t])
   (:import [foo.bar Baz]))
 
+
 :eof
+
+:schema.core/keyword-with-full-ns
+
+::s/schema-option
+
+{:foo :bar
+ {:x 1} {:outer-val-key {:k :val}}}
 
 ;; (do
 ;;   (foo bar baz))

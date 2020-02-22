@@ -6,8 +6,16 @@ type
   OperationMode = enum
     resolveSymbols
 
+  PlatformType* = enum
+    clojure_source
+    clojurescript_source
+    
+  SourceRoot* = object
+    dir_path*: string
+    platform_type*: PlatformType
+
   Options* = object
-    source_roots*: seq[string]
+    source_roots*: seq[SourceRoot] #TODO: source_roots | filename
     file_name*: string
     command*: string
 
@@ -751,17 +759,17 @@ proc not_empty*(s: string): bool = not is_nil_or_whitespace(s)
 proc find_and_print_reframe_data(opts: Options): Environment =
   let env = new_environment()
   var item_defs: seq[ReframeItem] = @[]
-  let src_roots = filter(opts.source_roots, not_empty)
+  let src_roots = opts.source_roots#filter(opts.source_roots, not_empty)
   for root in src_roots:
-    if exists_dir(root):
+    if exists_dir(root.dir_path):
       try:
         # TODO: debug report branch should happen here
-        item_defs.add(find_reframe_items_in_root(opts, env, root))
+        item_defs.add(find_reframe_items_in_root(opts, env, root.dir_path))
       except:
-        echo "Unknown exception in source root: " & $root
+        echo "Unknown exception in source root: " & $root.dir_path
         raise
     else:
-      echo "not a directory: " & root
+      echo "not a directory: " & root.dir_path
   process_item_defs(opts, env, item_defs)
   return env
 
@@ -784,7 +792,7 @@ proc parse_command_line(): Option[Options] =
       else:
         if key == "r" or key == "root":
           if value != "":
-            opts.source_roots.add(value)
+            opts.source_roots.add(SourceRoot(dir_path: value, platform_type: clojurescript_source))
           else:
             raise new_exception(Exception, "missing 'source_root' value")
         else:

@@ -1,4 +1,4 @@
-import reframe, os, parseopt2, strutils, streams, edn, tables, options, sequtils, sets
+import reframe, os, parseopt, strutils, streams, edn, tables, options, sequtils, sets
 
 type
   KeywordOccurrence* = object
@@ -17,13 +17,19 @@ proc common_parse_opts(eof_val: EdnNode): edn.ParseOptions =
   parser_opts.comments_handling = discardComments
   return parser_opts
 
-proc fill_env_with_namespaces(opts: Options, env: Environment, occurrences: var seq[KeywordOccurrence]): void =
+proc fill_env_with_namespaces(opts: Options, src_root: SourceRoot, env: Environment, occurrences: var seq[KeywordOccurrence]): void =
   let eof_val : EdnNode = edn.new_edn_keyword("", "eof")
   var parser_opts = common_parse_opts(eof_val)
 
   init_edn_readers(parser_opts)
   var p: EdnParser
   p.options = parser_opts
+  var cond_expr_handling: ConditionalExpressionsHandling
+  case src_root.platform_type
+  of clojure_source:
+    cond_expr_handling = cljSource
+  of clojurescript_source:
+    cond_expr_handling = cljsSource
   var edn_stream = newFileStream(opts.file_name)
   p.open(edn_stream, opts.file_name)
   defer: p.close()
@@ -167,18 +173,18 @@ proc find_keywords_in_ns(opts: Options, env: Environment, ns: NamespaceObj): seq
     occurrences.add(occurrence)
   return occurrences
 
-proc find_keyword_occurrences_in_root(opts: Options, env: Environment, source_root: string): seq[KeywordOccurrence] =
-  assert exists_dir(source_root)
+proc find_keyword_occurrences_in_root(opts: Options, env: Environment, source_root: SourceRoot): seq[KeywordOccurrence] =
+  assert exists_dir(source_root.dir_path)
   var keyword_occurrs: seq[KeywordOccurrence] = @[]
 
-  for path in walk_dir_rec(source_root):
+  for path in walk_dir_rec(source_root.dir_path):
     if not (path.endsWith(".clj") or path.endsWith(".cljc") or path.endsWith(".cljs")):
       continue
     try:
       var updated_opts = opts
       updated_opts.file_name = path
       case opts.command
-      of "index": fill_env_with_namespaces(updated_opts, env, keyword_occurrs)
+      of "index": fill_env_with_namespaces(updated_opts, source_root, env, keyword_occurrs)
     except:
       echo "Failed when processing " & $path
       raise
@@ -194,17 +200,17 @@ proc find_keyword_occurrences_in_root(opts: Options, env: Environment, source_ro
 proc find_and_print_keyword_occurrences(opts: Options): Environment =
   let env = new_environment()
   var occurrs: seq[KeywordOccurrence] = @[] #ALT
-  let src_roots = filter(opts.source_roots, not_empty)
+  let src_roots = opts.source_roots
   for root in src_roots:
-    if exists_dir(root):
+    if exists_dir(root.dir_path):
       try:
         # TODO: debug report branch should happen here
         occurrs.add(find_keyword_occurrences_in_root(opts, env, root))
       except:
-        echo "Unknown exception in source root: " & $root
+        echo "Unknown exception in source root: " & $root.dir_path
         raise
     else:
-      echo "not a directory: " & root
+      echo "not a directory: " & root.dir_path
   #process_item_defs(opts, env, occurrs)#ALT
   # for k,v in env.namespaces:
   #   echo "FOUND: " & v.name
@@ -214,36 +220,53 @@ proc parse_command_line(): Option[Options] =
   let cmd_line = cast[seq[string]](command_line_params())
   var parsed = init_opt_parser(cmd_line)
   var opts: Options
-  var opt_count = 0
+  var expect_platform = false
+  var dir_path: string
   opts.source_roots = @[]
   for kind, key, value in parsed.getopt():
-    inc(opt_count)
     case kind
-    of cmd_long_option, cmd_short_option:
-      if value == "":
-        raise new_exception(Exception, "Unsupported option: " & key)
-      else:
-        if key == "r" or key == "root":
-          if value != "":
-            opts.source_roots.add(value)
-          else:
-            raise new_exception(Exception, "missing 'source_root' value")
-        else:
-          raise new_exception(Exception, "unsupported option: " & key)
     of cmd_argument:
-      if opts.command != "":
-        return none(Options)
       if key != "index":
         return none(Options) 
       else:
         opts.command = key
+    of cmd_long_option, cmd_short_option:
+      # -- platform
+      if expect_platform:
+        case key
+        of "platform", "p":
+          if value in @["clj", "cljs"]:
+            var plat: PlatformType
+            case value
+            of "clj":
+              plat = clojure_source
+            of "cljs":
+              plat = clojurescript_source
+            else:
+              return none(Options)
+            opts.source_roots.add(SourceRoot(dir_path: dir_path, platform_type: plat))
+            expect_platform = false
+            dir_path = ""
+        else:
+          return none(Options)
+
+      # -- root dirs
+      else:
+        case key
+        of "root", "r":
+          if value != "":
+            dir_path = value
+            expect_platform = true
+          else:
+            return none(Options)
+        else:
+          return none(Options)
     else:
       return none(Options)
-  if opt_count == 0: return none(Options)
   return some(opts)
 
 proc print_usage_and_quit(): void =
-  echo "usage: keyword_index cmd -r=src_root -r=other_root index"
+  echo "usage: clojure_keyword_index index -r=src_root -p=clj -r=other_root index -p=cljs"
   quit(1)
 
 if is_main_module:

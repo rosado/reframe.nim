@@ -337,28 +337,24 @@ proc resove_implementation(node, ns_symbol: EdnNode,
                          reframe_type: resolve_as,
                          symbol: last_form,
                          file_name: file_name,
-                         line: -1)
+                         line: node.line)
     # let's find the where the symb is defined
     let current_ns = env.namespaces[ns_symbol]
     let no_ns = last_form.symbol.ns == ""
-    let in_mappings = current_ns.mappings.contains(last_form.symbol.name)
-    if no_ns and in_mappings:
+    if no_ns and current_ns.mappings.contains(last_form.symbol.name):
       # we fill some details. The line number will be filled later
       assert (not current_ns.defines.contains(last_form.symbol.name))
       result.target_ns = new_edn_symbol("", current_ns.mappings[last_form.symbol.name][0])
-      #result.target_file_name = current_ns.file_name
     elif no_ns:
       result.target_ns = new_edn_symbol("", current_ns.name)
-      result.target_file_name = current_ns.file_name
       if current_ns.defines.contains(last_form.symbol.name):
         let define = current_ns.defines[last_form.symbol.name]
+        result.target_file_name = current_ns.file_name
         result.referenced_line = define.line
       else:
-        # must be in defines...
         # TODO: handle declares?
-        raise new_exception(Exception, "No define for symbol: " & $last_form & 
-                            " in nsmespace (file) " & $current_ns.name & 
-                            " (" & $current_ns.file_name & ")")
+        result.referenced_line = -1
+        result.target_file_name = ""
     else: # symbol has ns
       var target_ns_symbol: EdnNode
       var debugFlag = false
@@ -720,12 +716,12 @@ proc process_item_defs(opts: Options, env: Environment, item_defs: var seq[Refra
         case resolution.category
         of FoundDefinition:
           def.referenced_line = resolution.node.line
+          def.target_file_name = target_ns.file_name
         else:
           def.referenced_line = -1
+          def.target_file_name = ""
         def.target_ns = new_edn_symbol("", target_ns.name)
-        def.target_file_name = target_ns.file_name
       else:
-        #def.target_ns = nil
         def.target_file_name = ""
         def.referenced_line = -1
       item_defs[index] = def
@@ -741,17 +737,21 @@ proc process_item_defs(opts: Options, env: Environment, item_defs: var seq[Refra
         target_file_name = "*unknown*"
       else:
         target_file_name = def.target_file_name
-      echo format("$# var $# $# $#",
+      echo format("$# var $# $# $# $# $#",
                   format_event_key(def),
                   target_file_name,
                   def.referenced_line,
-                  def.reframe_type)
+                  def.reframe_type,
+                  def.file_name,
+                  def.line)
     of InlineDefinition:
-      echo format("$# inline $# $# $#",
+      echo format("$# inline $# $# $# $# $#",
                   format_event_key(def),
                   def.file_name,
                   def.line,
-                  def.reframe_type)
+                  def.reframe_type,
+                  def.file_name,
+                  def.line)
   return
 
 proc not_empty*(s: string): bool = not is_nil_or_whitespace(s)

@@ -681,7 +681,7 @@ proc format_event_key(def: ReframeItem): string =
   case def.kind
   of VarReference:
     if def.event_key.namespacing == LocalNamespace:
-      return format("$#/$#", def.target_ns, def.event_key.keyword.name)
+      return format(":$#/$#", def.target_ns, def.event_key.keyword.name)
     else:
       return $def.event_key
   of InlineDefinition:

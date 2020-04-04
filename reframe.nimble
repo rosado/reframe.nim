@@ -1,6 +1,6 @@
 # Package
 
-version       = "0.2.0"
+version       = "0.3.0"
 author        = "Roland Sadowski"
 description   = "Tools for working with re-frame ClojureScript projects"
 license       = "EPL-2.0"

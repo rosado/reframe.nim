@@ -686,12 +686,15 @@ proc format_event_key(def: ReframeItem): string =
     else:
       return $def.event_key
 
-
 proc find_reframe_items_in_root(opts: Options, env: Environment, source_root: string): seq[ReframeItem] =
   assert exists_dir(source_root)
   var item_defs: seq[ReframeItem] = @[]
 
+  proc is_clj_file(path: string): bool =
+    path.ends_with(".clj") or path.ends_with(".cljs") or path.ends_with(".cljc")
   for path in walk_dir_rec(source_root):
+    if not is_clj_file(path):
+      continue
     try:
       var updated_opts = opts
       updated_opts.file_name = path

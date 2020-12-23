@@ -5,9 +5,12 @@ import unittest
 import os
 import edn, reframe
 
-test "can add":
+test "everything":
   var opts: Options
-  opts.source_roots = @["test-data/src-a", "test-data/src-b"]
+  var
+    src_a = SourceRoot(dir_path: "test-data/src-a", platform_type: clojure_source)
+    src_b = SourceRoot(dir_path: "test-data/src-b", platform_type: clojure_source)
+  opts.source_roots = @[src_a, src_b]
 
   let env = new_environment()
   var reframe_defs: seq[ReframeItem] = @[]

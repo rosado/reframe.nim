@@ -687,7 +687,7 @@ proc format_event_key(def: ReframeItem): string =
       return $def.event_key
 
 proc find_reframe_items_in_root(opts: Options, env: Environment, source_root: string): seq[ReframeItem] =
-  assert exists_dir(source_root)
+  assert dir_exists(source_root)
   var item_defs: seq[ReframeItem] = @[]
 
   proc is_clj_file(path: string): bool =
@@ -757,14 +757,14 @@ proc process_item_defs(opts: Options, env: Environment, item_defs: var seq[Refra
                   def.line)
   return
 
-proc not_empty*(s: string): bool = not is_nil_or_whitespace(s)
+proc not_empty*(s: string): bool = not is_empty_or_whitespace(s)
 
 proc find_and_print_reframe_data(opts: Options): Environment =
   let env = new_environment()
   var item_defs: seq[ReframeItem] = @[]
   let src_roots = opts.source_roots#filter(opts.source_roots, not_empty)
   for root in src_roots:
-    if exists_dir(root.dir_path):
+    if dir_exists(root.dir_path):
       try:
         # TODO: debug report branch should happen here
         item_defs.add(find_reframe_items_in_root(opts, env, root.dir_path))

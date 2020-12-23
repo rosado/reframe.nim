@@ -1,6 +1,6 @@
 # (c) Roland Sadowski <r AT rosado c c>
 
-import os, parseopt2, strutils, streams, edn, tables, options, sequtils, sets
+import os, parseopt, strutils, streams, edn, tables, options, sets
 
 type
   OperationMode = enum

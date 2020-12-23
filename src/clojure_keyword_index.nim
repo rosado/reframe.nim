@@ -1,4 +1,4 @@
-import reframe, os, parseopt, strutils, streams, edn, tables, options, sequtils, sets
+import reframe, os, parseopt, strutils, streams, edn, tables, options
 
 type
   KeywordOccurrence* = object
@@ -174,7 +174,7 @@ proc find_keywords_in_ns(opts: Options, env: Environment, ns: NamespaceObj): seq
   return occurrences
 
 proc find_keyword_occurrences_in_root(opts: Options, env: Environment, source_root: SourceRoot): seq[KeywordOccurrence] =
-  assert exists_dir(source_root.dir_path)
+  assert dir_exists(source_root.dir_path)
   var keyword_occurrs: seq[KeywordOccurrence] = @[]
 
   for path in walk_dir_rec(source_root.dir_path):
@@ -202,7 +202,7 @@ proc find_and_print_keyword_occurrences(opts: Options): Environment =
   var occurrs: seq[KeywordOccurrence] = @[] #ALT
   let src_roots = opts.source_roots
   for root in src_roots:
-    if exists_dir(root.dir_path):
+    if dir_exists(root.dir_path):
       try:
         # TODO: debug report branch should happen here
         occurrs.add(find_keyword_occurrences_in_root(opts, env, root))

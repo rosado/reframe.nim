@@ -777,8 +777,24 @@ proc find_and_print_reframe_data(opts: Options): Environment =
   return env
 
 proc print_usage_and_quit(): void =
-  echo "usage: reframe cmd -r=src_root -r=other_root"
+  echo "usage: reframe cmd -r=PATHSPEC1 -r=PATHSPEC"
+  echo ""
+  echo "       where PATHSPEC = clj:path/to/src"
+  echo "       or    PATHSPEC = cljs:path/to/src"
   quit(1)
+
+proc parse_source_root(option_val: string): Option[SourceRoot] =
+  let parts = split(option_val, ":", 1)
+  if parts.len == 2:
+      case parts[0]
+      of "cljs":
+        result = some(SourceRoot(dir_path: parts[1], platform_type: clojurescript_source))
+      of "clj":
+        result = some(SourceRoot(dir_path: parts[1], platform_type: clojure_source))
+      else:
+        result = none(SourceRoot)
+  else:
+    result = none(SourceRoot)
 
 proc parse_command_line(): Option[Options] =
   let cmd_line = cast[seq[string]](command_line_params())
@@ -794,10 +810,11 @@ proc parse_command_line(): Option[Options] =
         raise new_exception(Exception, "Unsupported option: " & key)
       else:
         if key == "r" or key == "root":
-          if value != "":
-            opts.source_roots.add(SourceRoot(dir_path: value, platform_type: clojurescript_source))
+          let src_root = parse_source_root(value)
+          if src_root.is_some:
+            opts.source_roots.add(src_root.get)
           else:
-            raise new_exception(Exception, "missing 'source_root' value")
+            raise new_exception(Exception, "invalid 'source_root' value: " & value)
         else:
           raise new_exception(Exception, "unsupported option: " & key)
     of cmd_argument:

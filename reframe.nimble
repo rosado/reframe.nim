@@ -1,6 +1,6 @@
 # Package
 
-version       = "0.3.1"
+version       = "0.4.0"
 author        = "Roland Sadowski"
 description   = "Tools for working with re-frame ClojureScript projects"
 license       = "EPL-2.0"
@@ -11,5 +11,5 @@ bin           = @["reframe", "clojure_keyword_index"]
 
 # Dependencies
 
-requires "nim >= 0.20.2"
-requires "edn 0.2.1"
+requires "nim >= 1.4.0"
+requires "edn 0.2.3"

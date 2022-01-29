@@ -299,6 +299,77 @@ proc form_line_num(node: EdnNode): int =
   assert node.kind == EdnList
   return node.line
 
+type SymbolResolutionResultCategory* = enum
+  NamespaceNotFound
+  FoundDefinition
+  FoundRefer
+  FoundNamespaceOnly
+  NotFound
+
+type SymbolResolutionResultObj* {.acyclic.} = object
+  case category*: SymbolResolutionResultCategory
+  of NamespaceNotFound:
+    nil
+  of FoundNamespaceOnly:
+    nil
+  of NotFound:
+    nil
+  of FoundRefer:
+    refered*: (string, string)
+  of FoundDefinition:
+    node*: EdnNode
+  
+# take `symbol` (found in code, so it can be sth like: s/fn) and try to find
+# where it is defined (then maybe return it's metadata, file:line etc)
+proc resolve_symbol*(env: Environment, namespace: string, symbol: EdnNode): SymbolResolutionResultObj =
+  assert symbol.kind == EdnSymbol
+  let ns_symb = new_edn_symbol("", namespace)
+  if ns_symb in env.namespaces:
+    let ns = env.namespaces[ns_symb]
+    if symbol.symbol.ns != "":
+      if symbol.symbol.ns in ns.aliases:
+        # now lookup the symbol.name in the alias target ns
+        let target_ns_symb = new_edn_symbol("", ns.aliases[symbol.symbol.ns])
+        if target_ns_symb in env.namespaces:
+          let target_ns = env.namespaces[target_ns_symb]
+          if symbol.symbol.name in target_ns.defines:
+            let define = target_ns.defines[symbol.symbol.name]
+            return SymbolResolutionResultObj(category: FoundDefinition,
+                                             node: define)
+          else:
+            return SymbolResolutionResultObj(category: FoundNamespaceOnly)
+        else:
+          return SymbolResolutionResultObj(category: NamespaceNotFound)
+      elif symbol.symbol.ns in ns.required:
+        # symbol potentially in 'required' ns, look it up in that ns if possible
+        let target_ns_symb = new_edn_symbol("", symbol.symbol.ns)
+        if target_ns_symb in env.namespaces:
+          let target_ns = env.namespaces[target_ns_symb]
+          if symbol.symbol.name in target_ns.defines:
+            return SymbolResolutionResultObj(category: FoundDefinition)
+        else:
+          return SymbolResolutionResultObj(category: FoundNamespaceOnly)
+      else:
+        # this means the symbol's namespace is not required in current ns
+        return SymbolResolutionResultObj(category: NotFound)
+    else:
+      if symbol.symbol.name in ns.mappings:
+        var refered  = ns.mappings[symbol.symbol.name]
+        # we try to follow through to the refered ns if possible
+        var resolved_refer = resolve_symbol(env, refered[0], symbol)
+        case resolved_refer.category
+        of FoundDefinition:
+          return resolved_refer
+        else:
+          return SymbolResolutionResultObj(category: FoundRefer,
+                                           refered: refered)
+      elif symbol.symbol.name in ns.defines:
+        let define = ns.defines[symbol.symbol.name]
+        return SymbolResolutionResultObj(category: FoundDefinition,
+                                         node: define)
+      else:
+        return SymbolResolutionResultObj(category: NotFound)
+  return SymbolResolutionResultObj(category: NamespaceNotFound)
 
 proc resove_implementation(node, ns_symbol: EdnNode,
                                   resolve_as: ReframeType,
@@ -491,78 +562,6 @@ proc common_parse_opts(eof_val: EdnNode): edn.ParseOptions =
   parser_opts.eof_value = eof_val
   parser_opts.comments_handling = discardComments#keepComments
   return parser_opts
-
-type SymbolResolutionResultCategory* = enum
-  NamespaceNotFound
-  FoundDefinition
-  FoundRefer
-  FoundNamespaceOnly
-  NotFound
-
-type SymbolResolutionResultObj* {.acyclic.} = object
-  case category*: SymbolResolutionResultCategory
-  of NamespaceNotFound:
-    nil
-  of FoundNamespaceOnly:
-    nil
-  of NotFound:
-    nil
-  of FoundRefer:
-    refered*: (string, string)
-  of FoundDefinition:
-    node*: EdnNode
-  
-# take `symbol` (found in code, so it can be sth like: s/fn) and try to find
-# where it is defined (then maybe return it's metadata, file:line etc)
-proc resolve_symbol*(env: Environment, namespace: string, symbol: EdnNode): SymbolResolutionResultObj =
-  assert symbol.kind == EdnSymbol
-  let ns_symb = new_edn_symbol("", namespace)
-  if ns_symb in env.namespaces:
-    let ns = env.namespaces[ns_symb]
-    if symbol.symbol.ns != "":
-      if symbol.symbol.ns in ns.aliases:
-        # now lookup the symbol.name in the alias target ns
-        let target_ns_symb = new_edn_symbol("", ns.aliases[symbol.symbol.ns])
-        if target_ns_symb in env.namespaces:
-          let target_ns = env.namespaces[target_ns_symb]
-          if symbol.symbol.name in target_ns.defines:
-            let define = target_ns.defines[symbol.symbol.name]
-            return SymbolResolutionResultObj(category: FoundDefinition,
-                                             node: define)
-          else:
-            return SymbolResolutionResultObj(category: FoundNamespaceOnly)
-        else:
-          return SymbolResolutionResultObj(category: NamespaceNotFound)
-      elif symbol.symbol.ns in ns.required:
-        # symbol potentially in 'required' ns, look it up in that ns if possible
-        let target_ns_symb = new_edn_symbol("", symbol.symbol.ns)
-        if target_ns_symb in env.namespaces:
-          let target_ns = env.namespaces[target_ns_symb]
-          if symbol.symbol.name in target_ns.defines:
-            return SymbolResolutionResultObj(category: FoundDefinition)
-        else:
-          return SymbolResolutionResultObj(category: FoundNamespaceOnly)
-      else:
-        # this means the symbol's namespace is not required in current ns
-        return SymbolResolutionResultObj(category: NotFound)
-    else:
-      if symbol.symbol.name in ns.mappings:
-        var refered  = ns.mappings[symbol.symbol.name]
-        # we try to follow through to the refered ns if possible
-        var resolved_refer = resolve_symbol(env, refered[0], symbol)
-        case resolved_refer.category
-        of FoundDefinition:
-          return resolved_refer
-        else:
-          return SymbolResolutionResultObj(category: FoundRefer,
-                                           refered: refered)
-      elif symbol.symbol.name in ns.defines:
-        let define = ns.defines[symbol.symbol.name]
-        return SymbolResolutionResultObj(category: FoundDefinition,
-                                         node: define)
-      else:
-        return SymbolResolutionResultObj(category: NotFound)
-  return SymbolResolutionResultObj(category: NamespaceNotFound)
 
 proc is_symbol_resolved_as*(env: Environment, 
                            namespace: string,

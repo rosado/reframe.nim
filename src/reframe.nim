@@ -707,7 +707,7 @@ proc format_event_key(def: ReframeItem): string =
     else:
       return $def.event_key
   of InlineDefinition:
-    if def.event_key.namespacing == LocalNamespace and def.current_ns.is_some():
+    if def.event_key.kind == EdnKeyword and def.event_key.namespacing == LocalNamespace and def.current_ns.is_some():
       return format(":$#/$#", def.current_ns.get(), def.event_key.keyword.name)
     else:
       return $def.event_key

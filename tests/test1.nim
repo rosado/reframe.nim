@@ -2,7 +2,7 @@
 
 import unittest
 
-import os
+import os, sequtils
 import edn, reframe
 
 test "everything":
@@ -19,7 +19,7 @@ test "everything":
     updated_opts.file_name = path
     find_reframe_items(updated_opts, env, reframe_defs)
 
-  assert reframe_defs.len == 4
+  assert reframe_defs.len == 5
   
   block:
     let symb = new_edn_symbol("s", "fn")
@@ -59,7 +59,16 @@ test "everything":
 
     r = is_symbol_resolved_as(env, "foo.events", new_edn_symbol("", "zoo-fn"), new_edn_symbol("foo.zoo", "zoo-fn"))
     assert r
+
+
+  # case when the reg-sub key is not a keyword but a var reference
+  let defs1 =  reframe_defs.filter(
+    proc (def: ReframeItem): bool = def.event_key == new_edn_keyword("", "defined-key"))
+  assert defs1.len == 1
     
   for item in reframe_defs:
+    # echo "ITEM KEY: ", $item.event_key.kind
+    # if item.event_key.kind == EdnList:
+    #   echo "FIST IN LIST: ", $item.event_key.list[0]
     echo $item.reframe_type & " " & $item.event_key , " ", item.line, " ", $item.kind, " ", $item.file_name
   #check add(5, 5) == 10

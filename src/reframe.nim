@@ -371,21 +371,45 @@ proc resolve_symbol*(env: Environment, namespace: string, symbol: EdnNode): Symb
         return SymbolResolutionResultObj(category: NotFound)
   return SymbolResolutionResultObj(category: NamespaceNotFound)
 
+# this proc resolves the key, mostly for presentation reasons.
+# if we can't resolve the symbol we return what was there, let caller
+# deal with presenting it on screen sensibly.
+proc safely_extract_item_key(key_expr, ns_symbol: EdnNode, env: Environment): EdnNode =
+  case key_expr.kind
+  of EdnKeyword: # and key_expr.namespacing == LocalNamespace:
+    return key_expr
+  of EdnSymbol:
+    let resolution = resolve_symbol(env, ns_symbol.symbol.name, key_expr)
+    case resolution.category
+    of FoundDefinition:
+      # only def exprs...
+      let expr = resolution.node
+      if expr.kind == EdnList and expr.list[0] == new_edn_symbol("", "def"):
+        return expr.list[expr.list.high]
+    else:
+      discard
+  else:
+    discard
+  return key_expr
+
 proc resove_implementation(node, ns_symbol: EdnNode,
-                                  resolve_as: ReframeType,
-                                  env: Environment,
-                                  file_name: string): ReframeItem =
+                           resolve_as: ReframeType,
+                           env: Environment,
+                           file_name: string): ReframeItem =
   ## node - the EdnNode we're trying to resolve
   ## ns_symbol - currently processed namespace
   let last_form = node.list[node.list.high()]
   let item_key = node.list[1]
+  let resolved_item_key = safely_extract_item_key(item_key, ns_symbol, env)
+
   # var anon_fn_alternatives = init_hash_set[EdnNode]()
   # anon_fn_alternatives.incl(new_edn_symbol("", "fn"))
   # anon_fn_alternatives.incl(new_edn_symbol("schema.core", "fn"))
   # anon_fn_alternatives.incl(new_edn_symbol("s", "fn"))
   # anon_fn_alternatives.incl(new_edn_symbol("", "letfn"))
   assert (item_key != nil)
-  result = ReframeItem(event_key: item_key, reframe_type: resolve_as)
+
+  result = ReframeItem(event_key: resolved_item_key, reframe_type: resolve_as)
 
   case last_form.kind
   of EdnList:
@@ -393,18 +417,21 @@ proc resove_implementation(node, ns_symbol: EdnNode,
     # either way, we treat it as inline definition
     #if is_form_starting_with(last_form, anon_fn_alternatives):
     let inline_fn_line_num = form_line_num(last_form)
-    result = ReframeItem(event_key: item_key,
+    result = ReframeItem(event_key: resolved_item_key,
                          reframe_type: resolve_as,
                          kind: InlineDefinition,
                          file_name: file_name,
                          line: inline_fn_line_num)
-    if item_key.namespacing == LocalNamespace:
+    # TODO: need to handle NonLocalNamespace case
+    if item_key.kind == EdnKeyword and item_key.namespacing == LocalNamespace:
       result.current_ns = some(ns_symbol)
+    elif item_key.kind == EdnSymbol:
+      result.current_ns = none(EdnNode)
     else:
       result.current_ns = none(EdnNode)
   of EdnSymbol:
     result = ReframeItem(kind: VarReference,
-                         event_key: item_key,
+                         event_key: resolved_item_key,
                          reframe_type: resolve_as,
                          symbol: last_form,
                          file_name: file_name,

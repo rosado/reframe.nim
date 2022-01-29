@@ -9,3 +9,5 @@
 (def max-value 10)
 
 (def foo 1)
+
+(def defined-key :defined-key)

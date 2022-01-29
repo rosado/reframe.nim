@@ -41,6 +41,10 @@
  :current-status
  (fn [db _] (get-in db [:status])))
 
+(reg-sub
+ events/defined-key
+ (fn [db _] :OK))
+
 ;;; fooo.bar OR [foo :a]
 (defn- libspec?
   "Returns true if x is a libspec"
